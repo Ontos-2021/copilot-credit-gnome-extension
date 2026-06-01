@@ -1,4 +1,5 @@
 import St from 'gi://St';
+import Clutter from 'gi://Clutter';
 import GLib from 'gi://GLib';
 import Gio from 'gi://Gio';
 import GObject from 'gi://GObject';
@@ -21,11 +22,18 @@ class CopilotIndicator extends PanelMenu.Button {
         this._selectedAccount = null;
         this._accountItems = [];
 
+        this._box = new St.BoxLayout({
+            style_class: 'panel-status-menu-box',
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+
         this._label = new St.Label({
             text: 'Copilot ...',
-            style_class: 'copilot-credit-panel-label'
+            style_class: 'copilot-credit-panel-label',
+            y_align: Clutter.ActorAlign.CENTER,
         });
-        this.add_child(this._label);
+        this._box.add_child(this._label);
+        this.add_child(this._box);
 
         this._buildMenu();
         this._scheduleRefresh();
@@ -43,6 +51,9 @@ class CopilotIndicator extends PanelMenu.Button {
 
         this._premiumItem = new PopupMenu.PopupMenuItem('Copilot usage: ...', {reactive: false});
         this.menu.addMenuItem(this._premiumItem);
+
+        this._allowanceItem = new PopupMenu.PopupMenuItem('Allowance: ...', {reactive: false});
+        this.menu.addMenuItem(this._allowanceItem);
 
         this._billingItem = new PopupMenu.PopupMenuItem('Billing: ...', {reactive: false});
         this.menu.addMenuItem(this._billingItem);
@@ -130,8 +141,16 @@ class CopilotIndicator extends PanelMenu.Button {
         let total = data.total_quantity ?? data.total_premium_requests ?? 0;
         let unitType = data.unit_type || 'requests';
         let suffix = unitType.startsWith('request') ? 'pr' : unitType.startsWith('credit') ? 'cr' : unitType;
-        this._label.text = 'Copilot ' + this._formatNumber(total) + suffix;
+        let percent = data.percentage_used;
+        let percentText = percent === null || percent === undefined ? '' : ' ' + this._formatNumber(percent) + '%';
+        this._label.text = 'Copilot ' + this._formatNumber(total) + suffix + percentText;
         this._premiumItem.label.text = 'This month: ' + this._formatNumber(total) + ' ' + unitType;
+        if (data.total_allowance) {
+            this._allowanceItem.label.text = 'Allowance: ' + this._formatNumber(data.total_allowance)
+                + ' ' + unitType + ', ' + this._formatNumber(data.remaining_quantity || 0) + ' left';
+        } else {
+            this._allowanceItem.label.text = 'Allowance: not available';
+        }
         this._billingItem.label.text = 'Billing: $' + this._formatMoney(data.net_amount || 0)
             + ' charged, $' + this._formatMoney(data.discount_amount || 0) + ' covered';
 

@@ -9,6 +9,7 @@ GNOME Shell extension that shows GitHub Copilot billing usage in the top bar.
 - Supports multiple GitHub accounts logged into GitHub CLI.
 - Switches viewed account from the extension menu without changing the global active `gh` account.
 - Shows model breakdown, covered amount, charged amount, and last refresh time.
+- Shows used percentage and remaining allowance when a monthly total is known.
 - Refreshes automatically every 5 minutes and includes a manual refresh action.
 
 ## Requirements
@@ -54,6 +55,20 @@ The selected account is persisted in:
 ```
 
 No GitHub token is stored by this extension.
+
+## Monthly Allowance
+
+GitHub's billing API returns usage, but may not expose your plan allowance. The helper uses a default of `1500` requests/credits and lets you override totals per account:
+
+```bash
+python3 ~/.local/share/gnome-shell/extensions/copilot-credit@local/copilot-helper.py --set-total YOUR_USERNAME 7000 --unit requests
+```
+
+Overrides are stored in:
+
+```text
+~/.config/copilot-credit/quotas.json
+```
 
 ## Manual Test
 

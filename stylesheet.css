@@ -1,4 +1,5 @@
 .copilot-credit-panel-label {
     font-weight: bold;
-    padding: 0 8px;
+    -natural-hpadding: 8px;
+    -minimum-hpadding: 6px;
 }

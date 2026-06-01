@@ -6,6 +6,8 @@ NOW = time.gmtime()
 YEAR, MONTH = NOW.tm_year, NOW.tm_mon
 CONFIG_DIR = os.path.expanduser("~/.config/copilot-credit")
 SELECTED_FILE = os.path.join(CONFIG_DIR, "selected_account")
+QUOTAS_FILE = os.path.join(CONFIG_DIR, "quotas.json")
+DEFAULT_TOTALS = {"requests": 1500, "credits": 1500}
 
 def find_gh():
     for path in [os.path.expanduser("~/.local/bin/gh"), "gh"]:
@@ -121,6 +123,44 @@ def save_selected_account(username):
     with open(SELECTED_FILE, "w") as f:
         f.write(username.strip())
 
+def quota_for(username, unit_type):
+    key = "credits" if unit_type.startswith("credit") else "requests"
+    quota = DEFAULT_TOTALS.get(key)
+    try:
+        with open(QUOTAS_FILE) as f:
+            data = json.load(f)
+        value = None
+        if isinstance(data.get(username), dict):
+            value = data[username].get(key) or data[username].get(unit_type)
+        elif username in data:
+            value = data[username]
+        if value is None and isinstance(data.get("default"), dict):
+            value = data["default"].get(key) or data["default"].get(unit_type)
+        elif value is None:
+            value = data.get("default")
+        if value is not None:
+            quota = as_number(value)
+    except Exception:
+        pass
+    return quota if quota and quota > 0 else None
+
+def save_quota(username, total, unit_type="requests"):
+    os.makedirs(CONFIG_DIR, exist_ok=True)
+    try:
+        with open(QUOTAS_FILE) as f:
+            data = json.load(f)
+            if not isinstance(data, dict):
+                data = {}
+    except Exception:
+        data = {}
+    data.setdefault(username, {})
+    if not isinstance(data[username], dict):
+        data[username] = {}
+    key = "credits" if unit_type.startswith("credit") else "requests"
+    data[username][key] = as_number(total)
+    with open(QUOTAS_FILE, "w") as f:
+        json.dump(data, f, indent=2, sort_keys=True)
+
 def output(payload):
     print(json.dumps(payload, indent=2, ensure_ascii=False))
 
@@ -193,6 +233,13 @@ def data(user_arg=None):
     if summary_items and summary_items[0].get("unitType"):
         unit_type = summary_items[0]["unitType"].lower()
 
+    total_allowance = quota_for(username, unit_type)
+    remaining_quantity = None
+    percentage_used = None
+    if total_allowance:
+        remaining_quantity = max(total_allowance - total_quantity, 0)
+        percentage_used = min((total_quantity / total_allowance) * 100, 999)
+
     result = {
         "ok": True,
         "username": username,
@@ -201,6 +248,9 @@ def data(user_arg=None):
         "period": f"{YEAR}-{MONTH:02d}",
         "unit_type": unit_type,
         "total_quantity": round(total_quantity, 2),
+        "total_allowance": round(total_allowance, 2) if total_allowance else None,
+        "remaining_quantity": round(remaining_quantity, 2) if remaining_quantity is not None else None,
+        "percentage_used": round(percentage_used, 1) if percentage_used is not None else None,
         "total_premium_requests": round(total_quantity),
         "gross_amount": round(gross_amount, 4),
         "discount_amount": round(discount_amount, 4),
@@ -233,6 +283,20 @@ def main():
             return
         save_selected_account(args[index + 1])
         output({"ok": True, "selected_account": args[index + 1]})
+        return
+
+    if "--set-total" in args:
+        index = args.index("--set-total")
+        if index + 2 >= len(args):
+            output({"ok": False, "error": "--set-total requires username and total"})
+            return
+        unit_type = "requests"
+        if "--unit" in args:
+            unit_index = args.index("--unit")
+            if unit_index + 1 < len(args):
+                unit_type = args[unit_index + 1]
+        save_quota(args[index + 1], args[index + 2], unit_type=unit_type)
+        output({"ok": True, "username": args[index + 1], "total_allowance": as_number(args[index + 2]), "unit_type": unit_type})
         return
 
     user_arg = None
