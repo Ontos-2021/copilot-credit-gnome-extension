@@ -1,0 +1,7 @@
+{
+  "name": "Copilot Credit",
+  "description": "Shows GitHub Copilot usage and billing in the GNOME top bar",
+  "uuid": "copilot-credit@local",
+  "shell-version": ["50"],
+  "version": 1
+}
